@@ -50,7 +50,9 @@ public class RomimoStep {
         clickFilterButton();
         wait(1);
 
-        return driver.findElements(By.tagName("data-articleid"))
+        List<WebElement> elements = driver.findElements(By.xpath("//*[@data-articleid]"));
+        logger.info("Found {} elements", elements.size());
+        return elements
                 .stream()
                 .map(this::mapToRealEstateItems)
                 .toList();
@@ -82,7 +84,8 @@ public class RomimoStep {
     private void displayFilteringSection() {
         WebElement filterButton = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("/html/body/div[8]/div/div/div[1]/div/a")));
-        filterButton.click();
+        Actions actions = new Actions(driver);
+        actions.moveToElement(filterButton).click().perform();
     }
 
     private void clickFilterButton() {
@@ -147,8 +150,8 @@ public class RomimoStep {
     public void acceptConsent() {
         WebElement consentElement = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//a[@class='cl-consent__btn cl-consent-node-a']")));
         try {
-            logger.info("Consent accepted in normal flow");
             consentElement.click();
+            logger.info("Consent accepted in normal flow");
         } catch (Exception e) {
             logger.info("Consent not accepted in normal flow, exception occured");
         }
@@ -161,14 +164,17 @@ public class RomimoStep {
                 consentElement.click();
                 return true;
             }
-            if (Math.abs(Duration.between(LocalDateTime.now(), startDate).toMillis()) > 5000) {
-                logger.info("thread name {}", Thread.currentThread());
-                return true;
-            }
-            return false;
         } catch (Exception e) {
             logger.error("Exception if displayed");
             return false;
         }
+        long abs = Math.abs(Duration.between(LocalDateTime.now(), startDate).toMillis());
+        logger.info("abs {}", abs);
+        if (abs > 5000) {
+            logger.info("thread name {}", Thread.currentThread());
+            return true;
+        }
+        return false;
+
     }
 }

@@ -20,8 +20,9 @@ public class ConsentTaskManager {
     public void schedule(Function<LocalDateTime, Boolean> toExecuted, LocalDateTime startDate) {
         task = new TimerTask() {
             public void run() {
-                logger.info("running... {}", LocalDateTime.now());
-                if (Boolean.TRUE.equals(toExecuted.apply(startDate))) {
+                Boolean applied = toExecuted.apply(startDate);
+                logger.info("running... {} applied {}", LocalDateTime.now(), applied);
+                if (Boolean.TRUE.equals(applied)) {
                     boolean cancelled = task.cancel();
                     if (cancelled) {
                         logger.info("Stop running the task to accept consent.");
