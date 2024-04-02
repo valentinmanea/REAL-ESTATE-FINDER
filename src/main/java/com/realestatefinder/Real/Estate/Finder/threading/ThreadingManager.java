@@ -7,11 +7,12 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 @Component
-public class ConsentTaskManager {
-    Logger logger = LoggerFactory.getLogger(ConsentTaskManager.class);
+public class ThreadingManager {
+    Logger logger = LoggerFactory.getLogger(ThreadingManager.class);
 
     private final Timer timer = new Timer();
 
@@ -31,5 +32,23 @@ public class ConsentTaskManager {
             }
         };
         timer.scheduleAtFixedRate(task, 0, 500);
+    }
+
+
+    public static void invokeWithTimeout(long timeoutInMillis, Runnable method) throws TimeoutException {
+        Thread thread = new Thread(method);
+
+        thread.start();
+
+        try {
+            thread.join(timeoutInMillis); // Wait for the thread to complete or timeout
+            if (thread.isAlive()) { // If the thread is still alive after join, it means it's still running
+                thread.interrupt(); // Interrupt the thread
+                throw new TimeoutException("Method execution timed out");
+            }
+        } catch (InterruptedException e) {
+            // Handle interrupted exception
+            e.printStackTrace();
+        }
     }
 }

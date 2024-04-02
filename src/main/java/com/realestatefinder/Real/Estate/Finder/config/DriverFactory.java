@@ -2,20 +2,21 @@ package com.realestatefinder.Real.Estate.Finder.config;
 
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.springframework.stereotype.Component;
+import org.openqa.selenium.chrome.ChromeOptions;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
-@Component
-public class SeleniumConfig {
+public class DriverFactory {
 
-    private final WebDriver driver;
-
-    public SeleniumConfig() {
-        driver = new ChromeDriver();
+    public static WebDriver build(){
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--headless=new");
+        WebDriver driver = new ChromeDriver(options);
         driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS);
 
         driver.manage().window().maximize();
+
+        return driver;
     }
 
     static {
@@ -27,9 +28,5 @@ public class SeleniumConfig {
         if (new File(path + fileName).exists())
             return path + fileName;
         return "";
-    }
-
-    public WebDriver getDriver() {
-        return driver;
     }
 }

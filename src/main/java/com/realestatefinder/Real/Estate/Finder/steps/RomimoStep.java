@@ -1,8 +1,10 @@
 package com.realestatefinder.Real.Estate.Finder.steps;
 
+import com.google.common.util.concurrent.SimpleTimeLimiter;
+import com.google.common.util.concurrent.TimeLimiter;
+import com.realestatefinder.Real.Estate.Finder.config.DriverManager;
 import com.realestatefinder.Real.Estate.Finder.db.RealEstateItemEntity;
-import com.realestatefinder.Real.Estate.Finder.threading.ConsentTaskManager;
-import com.realestatefinder.Real.Estate.Finder.config.SeleniumConfig;
+import com.realestatefinder.Real.Estate.Finder.threading.ThreadingManager;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -17,45 +19,49 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
+
+import static com.realestatefinder.Real.Estate.Finder.threading.ThreadingManager.invokeWithTimeout;
 
 @Component
 public class RomimoStep {
 
     Logger logger = LoggerFactory.getLogger(RomimoStep.class);
 
-    private final WebDriver driver;
+    private final DriverManager driverManager;
     private WebDriverWait wait;
+    private String driverTag;
 
 
-    public RomimoStep(SeleniumConfig seleniumConfig, ConsentTaskManager consentTaskManager) {
-        this.driver = seleniumConfig.getDriver();
-        this.wait = new WebDriverWait(driver, Duration.of(20, ChronoUnit.SECONDS));
+    public RomimoStep(ThreadingManager threadingManager, DriverManager driverManager) {
+        this.driverManager = driverManager;
 
-        consentTaskManager.schedule(this::acceptConsentIfDisplayed, LocalDateTime.now());
+        threadingManager.schedule(this::acceptConsentIfDisplayed, LocalDateTime.now());
     }
 
-    public List<RealEstateItemEntity> getRealEstateItems() {
-        openPage();
-        acceptConsent();
+    public List<RealEstateItemEntity> getRealEstateItems() throws TimeoutException {
+        invokeWithTimeout(10_000, this::init);
+        invokeWithTimeout(10_000, this::openPage);
+        invokeWithTimeout(10_000, this::acceptConsent);
+        invokeWithTimeout(10_000, this::insertLocation);
+        waitMs(500);
+        invokeWithTimeout(15_000, this::clickSearchButton);
+        waitMs(500);
+        invokeWithTimeout(15_000, this::filter);
+        waitMs(500);
+        invokeWithTimeout(15_000, this::clickFilterButton);
+        waitMs(500);
 
-        insertLocation();
-        wait(1);
-
-        clickSearchButton();
-        wait(1);
-
-        filter();
-        wait(1);
-
-        clickFilterButton();
-        wait(1);
-
-        List<WebElement> elements = driver.findElements(By.xpath("//*[@data-articleid]"));
+        List<WebElement> elements = getArticles();
         logger.info("Found {} elements", elements.size());
         return elements
                 .stream()
                 .map(this::mapToRealEstateItems)
                 .toList();
+    }
+
+    private List<WebElement> getArticles() {
+        return getCurrentDriver().findElements(By.xpath("//*[@data-articleid]"));
     }
 
     private RealEstateItemEntity mapToRealEstateItems(WebElement webElement) {
@@ -67,34 +73,36 @@ public class RomimoStep {
                 .build();
     }
 
-    private void wait(int seconds) {
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(seconds));
+    private void waitMs(int ms) {
+        getCurrentDriver().manage().timeouts().implicitlyWait(Duration.ofMillis(ms));
     }
 
     private void filter() {
         displayFilteringSection();
-
+        waitMs(500);
         countyFilter();
-        wait(2);
+        waitMs(1000);
 
         ownerFilter();
-        wait(2);
     }
 
     private void displayFilteringSection() {
         WebElement filterButton = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("/html/body/div[8]/div/div/div[1]/div/a")));
-        Actions actions = new Actions(driver);
+        Actions actions = new Actions(getCurrentDriver());
         actions.moveToElement(filterButton).click().perform();
     }
 
     private void clickFilterButton() {
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//button[@class='btnb btn-primary showAds']"))).click();
+        WebElement filterButton = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//button[@class='btnb btn-primary showAds']")));
+        logger.info("filter button appeared, will be clicked");
+        filterButton.click();
+        logger.info("filter button clicked");
     }
 
     private void ownerFilter() {
         WebElement elemetn = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id=\"mobileSearchModal\"]/div/div/div[3]/div[2]/div[3]/div/div/div[9]/span")));
-        Actions actions = new Actions(driver);
+        Actions actions = new Actions(getCurrentDriver());
         actions.moveToElement(elemetn).click().perform();
         logger.info("Filtered by owner");
     }
@@ -104,29 +112,22 @@ public class RomimoStep {
                 By.xpath("//input[@class='btn slide-menu-toggle radius']")));
         countyButton.click();
 
-        logger.info("Filter button pressed");
-
+        logger.info("County dropdown pressed");
+        waitMs(500);
         wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.id("mobileSearchModal")));
-        driver.findElements(By.tagName("li"))
+        logger.info("Waited...");
+        waitMs(500);
+
+        List<WebElement> liElements = getCurrentDriver().findElements(By.tagName("li"));
+        WebElement bucurestiElement = liElements
                 .stream()
                 .filter(element -> element.getText().contains("Bucuresti"))
                 .findAny().
-                get()
-                .click();
+                get();
+        bucurestiElement.click();
         logger.info("{} county selected", "Bucuresti");
     }
-
-//    private void subCountyFilter() {
-//        wait.until(ExpectedConditions.visibilityOfElementLocated(
-//                By.id("mobileSearchModal")));
-//        driver.findElements(By.tagName("li"))
-//                .stream()
-//                .filter(element -> element.getText().contains("Bucuresti"))
-//                .findAny().
-//                get()
-//                .click();
-//    }
 
     private void clickSearchButton() {
         WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(
@@ -143,8 +144,17 @@ public class RomimoStep {
     }
 
     public void openPage() {
-        driver.get("https://www.romimo.ro/");
+        getCurrentDriver().get("https://www.romimo.ro/");
         logger.info("Web page opened.");
+    }
+
+    public void init() {
+        driverTag = driverManager.add();
+        this.wait = new WebDriverWait(getCurrentDriver(), Duration.of(2, ChronoUnit.SECONDS));
+    }
+
+    private WebDriver getCurrentDriver() {
+        return driverManager.get(driverTag);
     }
 
     public void acceptConsent() {
@@ -159,22 +169,36 @@ public class RomimoStep {
 
     private boolean acceptConsentIfDisplayed(LocalDateTime startDate) {
         try {
-            WebElement consentElement = driver.findElement(By.xpath("//a[@class='cl-consent__btn cl-consent-node-a']"));
+            WebElement consentElement = getCurrentDriver().findElement(By.xpath("//a[@class='cl-consent__btn cl-consent-node-a']"));
             if (consentElement.isDisplayed()) {
                 consentElement.click();
                 return true;
             }
         } catch (Exception e) {
             logger.error("Exception if displayed");
+            if (timeoutBreak(startDate)) {
+                return true;
+            }
             return false;
         }
-        long abs = Math.abs(Duration.between(LocalDateTime.now(), startDate).toMillis());
-        logger.info("abs {}", abs);
-        if (abs > 5000) {
-            logger.info("thread name {}", Thread.currentThread());
+        if (timeoutBreak(startDate)) {
             return true;
         }
         return false;
 
+    }
+
+    private boolean timeoutBreak(LocalDateTime startDate) {
+        long abs = Math.abs(Duration.between(LocalDateTime.now(), startDate).toMillis());
+        logger.info("abs {}", abs);
+        if (abs > 2000) {
+            logger.info("thread name {}", Thread.currentThread());
+            return true;
+        }
+        return false;
+    }
+
+    public void close() {
+        driverManager.close(driverTag);
     }
 }
