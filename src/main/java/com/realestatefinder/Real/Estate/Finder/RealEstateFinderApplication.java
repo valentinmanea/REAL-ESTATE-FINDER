@@ -12,6 +12,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 @SpringBootApplication
 public class RealEstateFinderApplication implements CommandLineRunner {
@@ -31,9 +32,10 @@ public class RealEstateFinderApplication implements CommandLineRunner {
 	private DbProcessingService dbProcessingService;
 
 	@Override
-	public void run(String... args) {
+	public void run(String... args) throws TimeoutException {
 		emailSender.send();
-//		runFlowTimes(100);
+		romimoStep.getAllRealEstateItems();
+//		runFlowTimes(1);
 //		dbProcessingService.process(romimoStep.getRealEstateItems());
 	}
 
@@ -42,7 +44,7 @@ public class RealEstateFinderApplication implements CommandLineRunner {
 		int failedFlows = 0;
 		for(int i = 0; i < max;i++){
 			try{
-				List<RealEstateItemEntity> realEstateItems = romimoStep.getRealEstateItems();
+				List<RealEstateItemEntity> realEstateItems = romimoStep.getRealEstateItemsFirstPage();
 				logger.info("realEstateItems.size(): {}", realEstateItems.size());
 				if(realEstateItems.size() == 24){
 					correctFlows++;

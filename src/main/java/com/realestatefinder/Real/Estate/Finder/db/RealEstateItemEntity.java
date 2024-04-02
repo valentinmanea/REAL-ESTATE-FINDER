@@ -1,16 +1,14 @@
 package com.realestatefinder.Real.Estate.Finder.db;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Builder
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class RealEstateItemEntity {
 
     @Id

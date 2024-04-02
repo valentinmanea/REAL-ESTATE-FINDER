@@ -1,7 +1,5 @@
 package com.realestatefinder.Real.Estate.Finder.steps;
 
-import com.google.common.util.concurrent.SimpleTimeLimiter;
-import com.google.common.util.concurrent.TimeLimiter;
 import com.realestatefinder.Real.Estate.Finder.config.DriverManager;
 import com.realestatefinder.Real.Estate.Finder.db.RealEstateItemEntity;
 import com.realestatefinder.Real.Estate.Finder.threading.ThreadingManager;
@@ -18,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
@@ -39,7 +38,53 @@ public class RomimoStep {
         threadingManager.schedule(this::acceptConsentIfDisplayed, LocalDateTime.now());
     }
 
-    public List<RealEstateItemEntity> getRealEstateItems() throws TimeoutException {
+    public List<RealEstateItemEntity> getAllRealEstateItems() throws TimeoutException {
+        goToRealEstateTable();
+
+        List<RealEstateItemEntity> all = new ArrayList<>();
+        int count = 0;
+
+        while(!getLinkForArrow().isEmpty()){
+            List<RealEstateItemEntity> elements = getArticles()
+                    .stream()
+                    .map(this::mapToRealEstateItems)
+                    .toList();
+            all.addAll(elements);
+            logger.info("elements page: {} {}", count, elements);
+            count++;
+            String attribute = getLinkForArrow();
+            getArrowLiElement().click();
+            logger.info("count:{}, attribute: {}", count, attribute);
+            if(count > 2000){
+                break;
+            }
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+
+            }
+        }
+        return all;
+    }
+
+    private WebElement getArrowLiElement() {
+        return getCurrentDriver().findElement(By.xpath("//*[@id=\"content\"]/div/div/div[2]/ul/ul/div[3]")).findElement(By.tagName("li"));
+    }
+
+    private String getLinkForArrow() {
+        return getArrowLiElement().findElement(By.tagName("a")).getAttribute("href");
+    }
+
+    public List<RealEstateItemEntity> getRealEstateItemsFirstPage() throws TimeoutException {
+        goToRealEstateTable();
+
+            return getArticles()
+                .stream()
+                .map(this::mapToRealEstateItems)
+                .toList();
+    }
+
+    private void goToRealEstateTable() throws TimeoutException {
         invokeWithTimeout(10_000, this::init);
         invokeWithTimeout(10_000, this::openPage);
         invokeWithTimeout(10_000, this::acceptConsent);
@@ -51,13 +96,6 @@ public class RomimoStep {
         waitMs(500);
         invokeWithTimeout(15_000, this::clickFilterButton);
         waitMs(500);
-
-        List<WebElement> elements = getArticles();
-        logger.info("Found {} elements", elements.size());
-        return elements
-                .stream()
-                .map(this::mapToRealEstateItems)
-                .toList();
     }
 
     private List<WebElement> getArticles() {

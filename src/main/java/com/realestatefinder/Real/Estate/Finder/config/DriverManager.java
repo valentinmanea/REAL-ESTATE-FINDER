@@ -13,7 +13,7 @@ import java.util.UUID;
 public class DriverManager {
     private final Logger logger = LoggerFactory.getLogger(DriverManager.class);
 
-    private static Map<String, WebDriver> WEB_DRIVERS = new HashMap<>();
+    private static final Map<String, WebDriver> WEB_DRIVERS = new HashMap<>();
 
     public String add() {
         WebDriver webDriver = DriverFactory.build();
